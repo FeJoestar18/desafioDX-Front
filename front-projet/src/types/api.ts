@@ -15,7 +15,7 @@ export interface Integrante {
 
 export interface IntegrantePayload {
   nome: string;
-  funcao: string;
+  cargoId: number;
 }
 
 export interface Time {

@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import Select from 'react-select';
 
 interface CargoOption {
-  value: string;
+  value: number;
   label: string;
 }
 
@@ -26,8 +26,8 @@ export function CadastroIntegrantes() {
       try {
         const response = await cargosApi.listar();
         const options = response.map(cargo => ({
-          value: cargo.nome,
-          label: cargo.nome
+          value: cargo.id,
+          label: cargo.nome,
         }));
         setCargosOptions(options);
       } catch (error) {
@@ -37,7 +37,7 @@ export function CadastroIntegrantes() {
         setCargosLoading(false);
       }
     };
-    
+
     loadCargos();
   }, []);
 
@@ -52,7 +52,7 @@ export function CadastroIntegrantes() {
     try {
       await integrantesApi.cadastrar({
         nome: formData.nome,
-        funcao: selectedCargo.value
+        cargoId: selectedCargo.value,
       });
       toast.success('Integrante cadastrado com sucesso!');
       setFormData({ nome: '' });
@@ -79,10 +79,10 @@ export function CadastroIntegrantes() {
     }),
     option: (provided: any, state: any) => ({
       ...provided,
-      backgroundColor: state.isSelected 
-        ? '#1E293B' 
-        : state.isFocused 
-          ? '#F8FAFC' 
+      backgroundColor: state.isSelected
+        ? '#1E293B'
+        : state.isFocused
+          ? '#F8FAFC'
           : 'transparent',
       color: state.isSelected ? '#FFFFFF' : '#0F172A',
       cursor: 'pointer',
