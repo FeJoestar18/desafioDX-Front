@@ -8,10 +8,24 @@ import type {
   CargoPayload
 } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-async function fetchClient<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+const buildUrl = (endpoint: string, params?: Record<string, any>) => {
+  if (!params) return `${API_BASE_URL}${endpoint}`;
+
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      search.append(key, String(value));
+    }
+  });
+
+  const qs = search.toString();
+  return `${API_BASE_URL}${endpoint}${qs ? `?${qs}` : ''}`;
+};
+
+async function request<T>(endpoint: string, options?: RequestInit, params?: Record<string, any>): Promise<T> {
+  const response = await fetch(buildUrl(endpoint, params), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -36,49 +50,26 @@ async function fetchClient<T>(endpoint: string, options?: RequestInit): Promise<
   return response.text() as unknown as T;
 }
 
+export const http = {
+  get: <T>(url: string, params?: Record<string, any>) => request<T>(url, { method: 'GET' }, params),
+  post: <T>(url: string, data?: any) => request<T>(url, { method: 'POST', body: JSON.stringify(data) }),
+  put: <T>(url: string, data?: any) => request<T>(url, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: <T>(url: string) => request<T>(url, { method: 'DELETE' })
+};
+
 export const cargosApi = {
-  listar: () => fetchClient<Cargo[]>('/api/cargos'),
-  
-  buscarPorId: (id: number) => fetchClient<Cargo>(`/api/cargos/${id}`),
-  
-  cadastrar: (data: CargoPayload) => 
-    fetchClient<Cargo>('/api/cargos', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-    
-  atualizar: (id: number, data: CargoPayload) =>
-    fetchClient<Cargo>(`/api/cargos/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-    
-  remover: (id: number) =>
-    fetchClient<void>(`/api/cargos/${id}`, {
-      method: 'DELETE',
-    }),
+  listar: () => http.get<Cargo[]>('/api/cargos'),
+  buscarPorId: (id: number) => http.get<Cargo>(`/api/cargos/${id}`),
+  cadastrar: (data: CargoPayload) => http.post<Cargo>('/api/cargos', data),
+  atualizar: (id: number, data: CargoPayload) => http.put<Cargo>(`/api/cargos/${id}`, data),
+  remover: (id: number) => http.delete<void>(`/api/cargos/${id}`),
 };
 
 export const integrantesApi = {
-  listarSemTime: () =>
-    fetchClient<Integrante[]>('/api/integrantes/sem-times'),
-
-  cadastrar: (data: IntegrantePayload) => 
-    fetchClient<Integrante>('/api/integrantes', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  atualizar: (id: number, data: IntegrantePayload) =>
-    fetchClient<Integrante>(`/api/integrantes/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  remover: (id: number) =>
-    fetchClient<void>(`/api/integrantes/${id}`, {
-      method: 'DELETE',
-    }),
+  listarSemTime: () => http.get<Integrante[]>('/api/integrantes/sem-times'),
+  cadastrar: (data: IntegrantePayload) => http.post<Integrante>('/api/integrantes', data),
+  atualizar: (id: number, data: IntegrantePayload) => http.put<Integrante>(`/api/integrantes/${id}`, data),
+  remover: (id: number) => http.delete<void>(`/api/integrantes/${id}`),
 };
 
 export interface TimesQueryParams {
@@ -92,91 +83,34 @@ export interface TimesQueryParams {
 }
 
 export const timesApi = {
-  listar: (params?: TimesQueryParams) => {
-    const urlParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          urlParams.append(key, value.toString());
-        }
-      });
-    }
-    const queryString = urlParams.toString();
-    const endpoint = queryString ? `/api/times?${queryString}` : '/api/times';
-    return fetchClient<Page<Time>>(endpoint);
-  },
-
-  buscarPorId: (id: number) =>
-    fetchClient<Time>(`/api/times/${id}`),
-
-  cadastrar: (data: TimePayload) =>
-    fetchClient<Time>('/api/times', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  atualizar: (id: number, data: TimePayload) =>
-    fetchClient<Time>(`/api/times/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-
-  remover: (id: number) =>
-    fetchClient<void>(`/api/times/${id}`, {
-      method: 'DELETE',
-    }),
+  listar: (params?: TimesQueryParams) => http.get<Page<Time>>('/api/times', params),
+  buscarPorId: (id: number) => http.get<Time>(`/api/times/${id}`),
+  cadastrar: (data: TimePayload) => http.post<Time>('/api/times', data),
+  atualizar: (id: number, data: TimePayload) => http.put<Time>(`/api/times/${id}`, data),
+  remover: (id: number) => http.delete<void>(`/api/times/${id}`),
 };
 
+const withDateRange = (inicio?: string, fim?: string) => ({ inicio, fim });
+
 export const relatoriosApi = {
-  clubeMaisRecorrente: (inicio?: string, fim?: string) => {
-    const params = new URLSearchParams();
-    if (inicio) params.append('inicio', inicio);
-    if (fim) params.append('fim', fim);
-    const qs = params.toString();
-    return fetchClient<string>(`/api/clube-mais-recorrente${qs ? `?${qs}` : ''}`);
-  },
+  clubeMaisRecorrente: (inicio?: string, fim?: string) =>
+    http.get<string>('/api/clube-mais-recorrente', withDateRange(inicio, fim)),
 
-  contagemClubes: (inicio?: string, fim?: string) => {
-    const params = new URLSearchParams();
-    if (inicio) params.append('inicio', inicio);
-    if (fim) params.append('fim', fim);
-    const qs = params.toString();
-    return fetchClient<Record<string, number>>(`/api/contagem-clubes${qs ? `?${qs}` : ''}`);
-  },
+  contagemClubes: (inicio?: string, fim?: string) =>
+    http.get<Record<string, number>>('/api/contagem-clubes', withDateRange(inicio, fim)),
 
-  contagemFuncoes: (inicio?: string, fim?: string) => {
-    const params = new URLSearchParams();
-    if (inicio) params.append('inicio', inicio);
-    if (fim) params.append('fim', fim);
-    const qs = params.toString();
-    return fetchClient<Record<string, number>>(`/api/contagem-funcoes${qs ? `?${qs}` : ''}`);
-  },
+  contagemFuncoes: (inicio?: string, fim?: string) =>
+    http.get<Record<string, number>>('/api/contagem-funcoes', withDateRange(inicio, fim)),
 
-  funcaoMaisRecorrente: (inicio?: string, fim?: string) => {
-    const params = new URLSearchParams();
-    if (inicio) params.append('inicio', inicio);
-    if (fim) params.append('fim', fim);
-    const qs = params.toString();
-    return fetchClient<string>(`/api/funcao-mais-recorrente${qs ? `?${qs}` : ''}`);
-  },
+  funcaoMaisRecorrente: (inicio?: string, fim?: string) =>
+    http.get<string>('/api/funcao-mais-recorrente', withDateRange(inicio, fim)),
 
-  integranteMaisUsado: (inicio?: string, fim?: string) => {
-    const params = new URLSearchParams();
-    if (inicio) params.append('inicio', inicio);
-    if (fim) params.append('fim', fim);
-    const qs = params.toString();
-    return fetchClient<Integrante>(`/api/integrante-mais-usado${qs ? `?${qs}` : ''}`);
-  },
+  integranteMaisUsado: (inicio?: string, fim?: string) =>
+    http.get<Integrante>('/api/integrante-mais-usado', withDateRange(inicio, fim)),
 
-  timeMaisRecorrente: (inicio?: string, fim?: string) => {
-    const params = new URLSearchParams();
-    if (inicio) params.append('inicio', inicio);
-    if (fim) params.append('fim', fim);
-    const qs = params.toString();
-    return fetchClient<string[]>(`/api/time-mais-recorrente${qs ? `?${qs}` : ''}`);
-  },
+  timeMaisRecorrente: (inicio?: string, fim?: string) =>
+    http.get<string[]>('/api/time-mais-recorrente', withDateRange(inicio, fim)),
 
-  timePorData: (data: string) => {
-    return fetchClient<Time>(`/api/time?data=${data}`);
-  }
+  timePorData: (data: string) =>
+    http.get<Time>('/api/time', { data })
 };
